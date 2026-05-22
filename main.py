@@ -1,6 +1,10 @@
 from pathlib import Path
 import sys
 
+
+from sentence_transformers import SentenceTransformer
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableLambda
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import ollama
 from pypdf import PdfReader
@@ -63,13 +67,22 @@ def chunk_text(text: str) -> list[str]:
     return [chunk.strip() for chunk in splitter.split_text(text)]
 
 
-def main():
-    text = parse_pdf(Path(sys.argv[1]))
-    redacted = redact_pii_from_text(text)
-    chunks = chunk_text(redacted)
+def index_chunks(chunks: list[str]) -> faiss.IndexFlatL2:
+    # Import necessary library
 
-    for chunk in chunks:
-        print(f"<chunk>\n{chunk}\n<chunk>", end="\n\n")
+    embedding_model = SentenceTransformer("all-MiniLM-L6-v2", token=HF_TOKEN)
+    chunk_embeddings = embedding_model
+    IndexFlatL2
+
+
+def main():
+    cv_path = Path(sys.argv[1])
+
+    parse = RunnableLambda(parse_pdf)
+    redact = RunnableLambda(redact_pii_from_text)
+    chunk = RunnableLambda(chunk_text)
+
+    chain = parse | redact | chunk
 
 
 if __name__ == "__main__":
