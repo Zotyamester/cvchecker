@@ -1,8 +1,9 @@
 from pathlib import Path
 import sys
-from typing import List, Optional
+from typing import BinaryIO, List, Optional
 
 import faiss
+from fastapi import FastAPI, HTTPException, UploadFile, status
 from fastembed import TextEmbedding
 from google import genai
 from google.genai import types
@@ -13,7 +14,7 @@ import numpy as np
 from langchain_core.runnables import RunnableLambda
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import ollama
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 from pypdf import PdfReader
 from selectolax.lexbor import LexborHTMLParser
 from dotenv import load_dotenv
@@ -30,8 +31,10 @@ gemini = genai.Client()
 MAX_JOB_POSTING_CHUNKS = 10
 MAX_REQUIREMENT_SATISFYING_CV_CHUNKS = 5
 
+app = FastAPI()
 
-def parse_pdf(file: Path) -> str:
+
+def parse_pdf(file: BinaryIO) -> str:
     """Read all textual content of a PDF File
 
     Args:
@@ -97,7 +100,7 @@ def index_chunks(chunks: list[str]) -> tuple[list[str], faiss.IndexFlatL2]:
     return (chunks, index)
 
 
-def process_cv(file: Path) -> tuple[list[str], faiss.IndexFlatL2]:
+def process_cv(file: BinaryIO) -> tuple[list[str], faiss.IndexFlatL2]:
     parse = RunnableLambda(parse_pdf)
     redact = RunnableLambda(redact_pii_from_text)
     chunk = RunnableLambda(chunk_text)
@@ -290,18 +293,16 @@ def generate_report(
     return report
 
 
-def main():
-    cv_path = Path(sys.argv[1])
-    job_posting_url = URL(sys.argv[2])
+@app.post("/check-cv")
+def check_cv(cv: UploadFile, job_posting_link: HttpUrl):
+    if cv.content_type != "application/pdf" or not (cv.filename or "").lower().endswith(
+        ".pdf"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is not a PDF"
+        )
 
-    # cv_chunks, cv_indices = process_cv(cv_path)
-    # job_posting = process_job_posting(job_posting_url)
-    # report = generate_report(cv_chunks, cv_indices, job_posting)
-    # print("Report:")
-    # print(f"Role: {report.role}")
-    # print(f"Suitability score: {report.score}")
-    # print(f"Suitability explanation: {report.suitability}")
-
-
-if __name__ == "__main__":
-    main()
+    cv_chunks, cv_indices = process_cv(cv.file)
+    job_posting = process_job_posting(job_posting_link.encoded_string())
+    report = generate_report(cv_chunks, cv_indices, job_posting)
+    return report
