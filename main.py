@@ -200,6 +200,9 @@ def process_job_posting(raw_job_posting: URL | str) -> JobPosting:
 
 class Report(BaseModel):
     role: str = Field(description="The official title of the role.")
+    decision: bool = Field(
+        description="The decision which is true if the candidate is a match for the role, and false otherwise."
+    )
     score: int = Field(
         description="A score from 0 to 100 that quantifies the suitability of the candidate for the role, based on the CV and the job posting. A score of 0 means that the candidate is not suitable at all for the role, while a score of 100 means that the candidate is perfectly suitable for the role. The score should be based on how well the candidate's qualifications, skills, and experiences (as described in the CV) match the requirements and criteria outlined in the job posting."
     )
@@ -277,12 +280,6 @@ def generate_report(
         contents=f"""
         You are a hiring expert.
         Your task is to generate a report on the suitability of a candidate for a job role, based on the candidate's CV and the job posting.
-
-        The report should contain:
-        1. The official title of the role.
-        2. A score from 0 to 100 that quantifies the suitability of the candidate for the role, based on the CV and the job posting. A score of 0 means that the candidate is not suitable at all for the role, while a score of 100 means that the candidate is perfectly suitable for the role. The score should be based on how well the candidate's qualifications, skills, and experiences (as described in the CV) match the requirements and criteria outlined in the job posting.
-        3. A detailed explanation of how suitable the candidate is for the role, based on the CV and the job posting. The explanation should be as specific as possible, citing concrete examples from the CV that match the requirements of the job posting, and providing a justification for why those examples are relevant.
-
         Use the following evidences to support your analysis:
 
         {suitability_explanations}
