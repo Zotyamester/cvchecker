@@ -305,16 +305,6 @@ def generate_report(
 
 
 def check_cv(cv: BinaryIO | str, raw_job_posting: URL | str):
-    # print(
-    #     str(cv)[:20],
-    #     type(cv),
-    #     isinstance(cv, BinaryIO),
-    #     str(raw_job_posting)[:20],
-    #     type(raw_job_posting),
-    #     isinstance(raw_job_posting, URL),
-    #     flush=True,
-    # )
-    # return
     cv_chunks, cv_indices = process_cv(cv)
     processed_job_posting = process_job_posting(raw_job_posting)
     report = generate_report(cv_chunks, cv_indices, processed_job_posting)
