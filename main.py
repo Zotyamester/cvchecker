@@ -1,5 +1,3 @@
-from pathlib import Path
-import sys
 from typing import BinaryIO, List, Optional
 
 import faiss
@@ -100,15 +98,15 @@ def index_chunks(chunks: list[str]) -> tuple[list[str], faiss.IndexFlatL2]:
     return (chunks, index)
 
 
-def process_cv(file: BinaryIO) -> tuple[list[str], faiss.IndexFlatL2]:
-    parse = RunnableLambda(parse_pdf)
+def process_cv(raw_cv: BinaryIO | str) -> tuple[list[str], faiss.IndexFlatL2]:
+    cv_content: str = parse_pdf(raw_cv) if isinstance(raw_cv, BinaryIO) else raw_cv
     redact = RunnableLambda(redact_pii_from_text)
     chunk = RunnableLambda(chunk_text)
     index = RunnableLambda(index_chunks)
 
-    cv_processing_chain = parse | redact | chunk | index
+    cv_processing_chain = redact | chunk | index
 
-    cv_chunks, cv_indices = cv_processing_chain.invoke(file)
+    cv_chunks, cv_indices = cv_processing_chain.invoke(cv_content)
     return (cv_chunks, cv_indices)
 
 
@@ -119,10 +117,12 @@ def retrieve_web_content(url: URL) -> str:
     parser = LexborHTMLParser(r.content)
 
     # Heuristic for removing (most commonly) irrelevant nodes
-    for node in parser.body.select("nav, header, footer, aside, script, style").matches:
-        node.remove()
-
-    text = parser.body.text(separator=" ", strip=True, skip_empty=True)
+    if body := parser.body:
+        for node in body.select("nav, header, footer, aside, script, style").matches:
+            node.remove()
+        text = body.text(separator=" ", strip=True, skip_empty=True)
+    else:
+        raise Exception("Webpage has no body")
 
     return text
 
@@ -148,7 +148,7 @@ def formalize_job_posting(
     query = "What is this role? Who is needed for this position? What criteria or requirements must be met by a candidate to be accepted for this job?"
 
     query_embedding = np.array(list(embedding_model.embed(query)), dtype=np.float32)
-    _, chunk_indices = index.search(query_embedding, MAX_JOB_POSTING_CHUNKS)
+    _, chunk_indices = index.search(query_embedding, MAX_JOB_POSTING_CHUNKS)  # type: ignore
     chunks = "\n".join(f"<chunk>{raw_chunks[i]}</chunk>" for i in chunk_indices[0])
 
     response = gemini.models.generate_content(
@@ -175,19 +175,27 @@ def formalize_job_posting(
     if job_posting is None:
         raise Exception("Failed to parse the job posting")
 
-    return job_posting
+    return job_posting  # type: ignore
 
 
-def process_job_posting(url: str) -> JobPosting:
-    retrieve = RunnableLambda(retrieve_web_content)
+def process_job_posting(raw_job_posting: URL | str) -> JobPosting:
+    job_posting_str = (
+        retrieve_web_content(raw_job_posting)
+        if isinstance(raw_job_posting, URL)
+        else raw_job_posting
+    )
     chunk = RunnableLambda(chunk_text)
     index = RunnableLambda(index_chunks)
 
-    job_posting_processing_chain = retrieve | chunk | index
+    job_posting_processing_chain = chunk | index
 
-    job_posting_chunks, job_posting_indices = job_posting_processing_chain.invoke(url)
-    job_posting = formalize_job_posting(job_posting_chunks, job_posting_indices)
-    return job_posting
+    job_posting_chunks, job_posting_indices = job_posting_processing_chain.invoke(
+        job_posting_str
+    )
+    processed_job_posting = formalize_job_posting(
+        job_posting_chunks, job_posting_indices
+    )
+    return processed_job_posting
 
 
 class Report(BaseModel):
@@ -213,7 +221,7 @@ class RequirementMatch(BaseModel):
 def generate_report(
     cv_chunks: list[str], cv_indices: faiss.IndexFlatL2, job_posting: JobPosting
 ) -> Report:
-    evidences = []
+    evidences: list[RequirementMatch] = []
     for requirement in job_posting.requirements:
         query = f"""How suitable is a candidate that meets the following requirement for the role of {job_posting.role}?
 
@@ -225,7 +233,7 @@ def generate_report(
         query_embedding = np.array(list(embedding_model.embed(query)), dtype=np.float32)
         _, chunk_indices = cv_indices.search(
             query_embedding, MAX_REQUIREMENT_SATISFYING_CV_CHUNKS
-        )
+        )  # type: ignore
         chunks = "\n".join(f"<chunk>{cv_chunks[i]}</chunk>" for i in chunk_indices[0])
 
         response = gemini.models.generate_content(
@@ -251,7 +259,7 @@ def generate_report(
         requirement_match = response.parsed
         if requirement_match is None:
             raise Exception("Failed to parse the requirement match")
-        evidences.append(requirement_match)
+        evidences.append(requirement_match)  # type: ignore
 
     suitability_explanations = "\n\n".join(
         f"""Requirement: {evidence.requirement.description}
@@ -290,13 +298,13 @@ def generate_report(
     report = response.parsed
     if report is None:
         raise Exception("Failed to parse the report")
-    return report
+    return report  # type: ignore
 
 
-def check_cv(cv: BinaryIO, job_posting_link: str):
+def check_cv(cv: BinaryIO | str, raw_job_posting: URL | str):
     cv_chunks, cv_indices = process_cv(cv)
-    job_posting = process_job_posting(job_posting_link)
-    report = generate_report(cv_chunks, cv_indices, job_posting)
+    processed_job_posting = process_job_posting(raw_job_posting)
+    report = generate_report(cv_chunks, cv_indices, processed_job_posting)
     return report
 
 
@@ -309,5 +317,5 @@ def check_cv_api(cv: UploadFile, job_posting_link: HttpUrl):
             status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is not a PDF"
         )
 
-    report = check_cv(cv.file, job_posting_link.encoded_string())
+    report = check_cv(cv.file, URL(job_posting_link.encoded_string()))
     return report
