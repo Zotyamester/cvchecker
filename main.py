@@ -293,8 +293,15 @@ def generate_report(
     return report
 
 
+def check_cv(cv: BinaryIO, job_posting_link: str):
+    cv_chunks, cv_indices = process_cv(cv)
+    job_posting = process_job_posting(job_posting_link)
+    report = generate_report(cv_chunks, cv_indices, job_posting)
+    return report
+
+
 @app.post("/check-cv")
-def check_cv(cv: UploadFile, job_posting_link: HttpUrl):
+def check_cv_api(cv: UploadFile, job_posting_link: HttpUrl):
     if cv.content_type != "application/pdf" or not (cv.filename or "").lower().endswith(
         ".pdf"
     ):
@@ -302,7 +309,5 @@ def check_cv(cv: UploadFile, job_posting_link: HttpUrl):
             status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is not a PDF"
         )
 
-    cv_chunks, cv_indices = process_cv(cv.file)
-    job_posting = process_job_posting(job_posting_link.encoded_string())
-    report = generate_report(cv_chunks, cv_indices, job_posting)
+    report = check_cv(cv.file, job_posting_link.encoded_string())
     return report
