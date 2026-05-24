@@ -219,4 +219,5 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-.antigravitycli
+.antigravitycli/
+.hf_cache/
