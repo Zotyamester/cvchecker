@@ -6,6 +6,33 @@ A lightweight, privacy-focused RAG pipeline wrapped in a FastAPI REST API. It ev
 - **Efficient Retrieval**: FAISS for in-memory, lightning-fast semantic search.
 - **Frontier Reasoning**: Google Gemini (Free Tier) for high-level analysis and scoring.
 
+## Prerequisites
+
+A quick note about the prerequisites...
+
+- **Python 3.13** was used for the development of this project, so no guarantees are given that it will work with any other versions of Python (although it almost certainly will).
+- Some parts of the pipeline rely on Google's Gemini models, thus an appropriate `GEMINI_API_KEY` variable shall be set in the environment to a key from [**Google AI studio**](https://aistudio.google.com/api-keys).
+- To avoid hitting rate limits with [**HuggingFace**](https://huggingface.co/settings/tokens) (used for the embedding model and the test dataset), it's advisable to set the `HF_TOKEN` variable as well.
+
+## Build & run
+
+The [`uv`](https://docs.astral.sh/uv/) package manager is used for this project, thus to pull all the dependencies, you'll first have to:
+```bash
+uv sync
+```
+
+Next, to get the system up and running locally in a developer environment:
+```bash
+fastapi dev
+```
+
+...or if you want to use it in a production environment (not recommended as of now):
+```bash
+fastapi run
+```
+
+By default, the API is exposed on [http://localhost:8000/](http://localhost:8000/), but this can be configured to anything else (with the help of FastAPI) if needed.
+
 ## Technical Stack
 
 | Component | Recommended Tool | Justification |
