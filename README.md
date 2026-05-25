@@ -11,10 +11,19 @@ A lightweight, privacy-focused RAG pipeline wrapped in a FastAPI REST API. It ev
 A quick note about the prerequisites...
 
 - **Python 3.13** was used for the development of this project, so no guarantees are given that it will work with any other versions of Python (although it almost certainly will).
-- Some parts of the pipeline rely on Google's Gemini models, thus an appropriate `GEMINI_API_KEY` variable shall be set in the environment to a key from [**Google AI studio**](https://aistudio.google.com/api-keys).
+- Some parts of the pipeline depend on `ollama` running on the host where the API is deployed. Thus [`ollama`](https://ollama.com/) shall be installed on the host.
+- Other parts rely on Google's Gemini models, thus an appropriate `GEMINI_API_KEY` variable shall be set in the environment to a key from [**Google AI studio**](https://aistudio.google.com/api-keys).
 - To avoid hitting rate limits with [**HuggingFace**](https://huggingface.co/settings/tokens) (used for the embedding model and the test dataset), it's advisable to set the `HF_TOKEN` variable as well.
 
 ## Build & run
+
+Ensure the `llama3.2:3b` model is downloaded to the host running Ollama:
+```bash
+ollama pull llama3.2:3b
+```
+
+> [!TIP]
+> If you don't have Ollama running in the background, you can start it up in a separate terminal with `ollama serve`.
 
 The [`uv`](https://docs.astral.sh/uv/) package manager is used for this project, thus to pull all the dependencies, you'll first have to:
 ```bash
